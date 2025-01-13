@@ -22,7 +22,7 @@ struct AddView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("type in expense details")
+                    Text("Type in expense details")
                 }
                 Section {
                     TextField("Name", text: $name)
@@ -79,47 +79,61 @@ class Expenses {
 
 struct ContentView: View {
     
-    func removeItems(at offsets: IndexSet) {
-        expenses.items.remove(atOffsets: offsets)
+    func removeItems(at offsets: IndexSet, from section: String) {
+        let itemsToDelete = offsets.map { index in
+            section == "Personal"
+                ? personalExpenses[index]
+                : otherExpenses[index]
+        }
+        
+        for item in itemsToDelete {
+            if let index = expenses.items.firstIndex(where: { $0.id == item.id }) {
+                expenses.items.remove(at: index)
+            }
+        }
     }
     
     @State private var expenses = Expenses()
     @State private var showingAddExpense = false
     
+    var personalExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Personal" }
+    }
+    
+    var otherExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type != "Personal" }
+    }
+    
     var body: some View {
         NavigationStack {
-            VStack{
+            VStack {
                 List {
-                    ForEach(expenses.items) { item in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                if item.type == "Personal" {
-                                    Label("Personal", systemImage: "person.fill")
-                                        .font(.subheadline)
-                                }
-                                if item.type == "Family" {
-                                    Label("Family", systemImage: "figure.2.and.child.holdinghands")
-                                        .font(.subheadline)
-                                }
-                                if item.type == "Dating" {
-                                    Label("Dating", systemImage: "heart.circle")
-                                        .font(.subheadline)
-                                }
-                                Text(item.name)
-                                    .font(.headline)
-                            }
-                            Spacer()
-                            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                    Section(header: Text("Personal Expenses")) {
+                        ForEach(personalExpenses) { item in
+                            ExpenseRow(item: item)
+                        }
+                        .onDelete { offsets in
+                            removeItems(at: offsets, from: "Personal")
                         }
                     }
-                    .onDelete(perform: removeItems)
+                    
+                    Section(header: Text("Other Expenses")) {
+                        ForEach(otherExpenses) { item in
+                            ExpenseRow(item: item)
+                        }
+                        .onDelete { offsets in
+                            removeItems(at: offsets, from: "Business")
+                        }
+                    }
                 }
             }
             .navigationTitle("iExpense")
             .toolbar {
                 ToolbarItem {
-                    Button("Add expense", systemImage: "plus.square") {
+                    Button {
                         showingAddExpense.toggle()
+                    } label: {
+                        Label("Add Expense", systemImage: "plus")
                     }
                     .sheet(isPresented: $showingAddExpense) {
                         AddView(expenses: expenses)
@@ -128,6 +142,42 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                if item.type == "Personal" {
+                    Label("Personal", systemImage: "person.fill")
+                        .font(.subheadline)
+                } else if item.type == "Family" {
+                    Label("Family", systemImage: "figure.2.and.child.holdinghands")
+                        .font(.subheadline)
+                } else if item.type == "Dating" {
+                    Label("Dating", systemImage: "heart.circle")
+                        .font(.subheadline)
+                }
+                Text(item.name)
+                    .font(.headline)
+            }
+            Spacer()
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundColor(amountColor(for: item.amount))
+        }
+    }
+    
+    func amountColor(for amount: Double) -> Color {
+        if amount < 50_000 {
+            return .green
+        } else if amount < 150_000 {
+            return .orange
+        } else {
+            return .red
+        }
     }
 }
 
